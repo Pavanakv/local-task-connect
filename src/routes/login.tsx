@@ -51,8 +51,8 @@ function LoginPage() {
         const parsed = signupSchema.safeParse({ name, email, password });
         if (!parsed.success) { toast.error(parsed.error.issues[0].message); return; }
         await signUp(parsed.data.name, parsed.data.email, parsed.data.password);
-        toast.success("Account created — check your email to confirm, then log in.");
-        setMode("login");
+        toast.success(`Welcome, ${parsed.data.name}!`);
+        navigate({ to: "/dashboard" });
       } else {
         await signIn(email, password);
         toast.success("Welcome back!");
