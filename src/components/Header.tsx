@@ -1,9 +1,9 @@
 import { Link, useNavigate, useRouterState } from "@tanstack/react-router";
-import { Wrench } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ThemeToggle } from "./ThemeToggle";
 import { useEffect, useState } from "react";
 import { store, type User } from "@/lib/store";
+import logo from "@/assets/logo.jpg";
 
 export function Header() {
   const navigate = useNavigate();
@@ -24,9 +24,7 @@ export function Header() {
     <header className="sticky top-0 z-40 w-full border-b border-border/60 bg-background/80 backdrop-blur-md">
       <div className="container mx-auto flex h-16 items-center justify-between px-4">
         <Link to="/" className="flex items-center gap-2">
-          <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-gradient-brand shadow-soft">
-            <Wrench className="h-5 w-5 text-primary-foreground" />
-          </div>
+          <img src={logo} alt="LocalFixr logo" className="h-9 w-9 rounded-lg object-cover shadow-soft" />
           <span className="text-lg font-bold tracking-tight">LocalFixr</span>
         </Link>
 
