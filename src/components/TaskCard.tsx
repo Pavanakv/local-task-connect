@@ -1,18 +1,19 @@
 import { MapPin, Tag, Clock, User } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
-import type { Task } from "@/lib/store";
+import type { TaskWithProfile } from "@/lib/db";
 
-function timeAgo(ts: number) {
-  const diff = Date.now() - ts;
+function timeAgo(iso: string) {
+  const diff = Date.now() - new Date(iso).getTime();
   const m = Math.floor(diff / 60000);
+  if (m < 1) return "just now";
   if (m < 60) return `${m}m ago`;
   const h = Math.floor(m / 60);
   if (h < 24) return `${h}h ago`;
   return `${Math.floor(h / 24)}d ago`;
 }
 
-export function TaskCard({ task, onClick }: { task: Task; onClick: () => void }) {
+export function TaskCard({ task, onClick }: { task: TaskWithProfile; onClick: () => void }) {
   return (
     <Card
       onClick={onClick}
@@ -25,7 +26,7 @@ export function TaskCard({ task, onClick }: { task: Task; onClick: () => void })
         </Badge>
         <span className="flex items-center gap-1 text-xs text-muted-foreground">
           <Clock className="h-3 w-3" />
-          {timeAgo(task.createdAt)}
+          {timeAgo(task.created_at)}
         </span>
       </div>
 
@@ -41,7 +42,7 @@ export function TaskCard({ task, onClick }: { task: Task; onClick: () => void })
         </span>
         <span className="flex items-center gap-1">
           <User className="h-3.5 w-3.5" />
-          {task.userName}
+          {task.profiles?.full_name ?? "Unknown"}
         </span>
       </div>
     </Card>

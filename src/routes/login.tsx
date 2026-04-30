@@ -1,13 +1,14 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Header } from "@/components/Header";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
-import { store, type User } from "@/lib/store";
+import { Toaster } from "@/components/ui/sonner";
 import { toast } from "sonner";
 import { z } from "zod";
+import { useAuth } from "@/lib/auth";
 
 type Search = { mode?: "login" | "signup" };
 
@@ -34,43 +35,41 @@ function LoginPage() {
   const { mode: initial } = Route.useSearch();
   const [mode, setMode] = useState<"login" | "signup">(initial ?? "login");
   const navigate = useNavigate();
+  const { user, signIn, signUp } = useAuth();
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [busy, setBusy] = useState(false);
 
-  const submit = (e: React.FormEvent) => {
+  useEffect(() => { if (user) navigate({ to: "/dashboard" }); }, [user, navigate]);
+
+  const submit = async (e: React.FormEvent) => {
     e.preventDefault();
-    const users = store.getUsers();
-    if (mode === "signup") {
-      const parsed = signupSchema.safeParse({ name, email, password });
-      if (!parsed.success) {
-        toast.error(parsed.error.issues[0].message);
-        return;
+    setBusy(true);
+    try {
+      if (mode === "signup") {
+        const parsed = signupSchema.safeParse({ name, email, password });
+        if (!parsed.success) { toast.error(parsed.error.issues[0].message); return; }
+        await signUp(parsed.data.name, parsed.data.email, parsed.data.password);
+        toast.success("Account created — check your email to confirm, then log in.");
+        setMode("login");
+      } else {
+        await signIn(email, password);
+        toast.success("Welcome back!");
+        navigate({ to: "/dashboard" });
       }
-      if (users.some((u) => u.email.toLowerCase() === email.toLowerCase())) {
-        toast.error("An account with this email already exists");
-        return;
-      }
-      const user: User = { id: crypto.randomUUID(), name: parsed.data.name, email: parsed.data.email, password };
-      store.saveUsers([...users, user]);
-      store.setCurrentUser(user);
-      toast.success(`Welcome, ${user.name}!`);
-      navigate({ to: "/dashboard" });
-    } else {
-      const user = users.find((u) => u.email.toLowerCase() === email.toLowerCase() && u.password === password);
-      if (!user) {
-        toast.error("Invalid email or password");
-        return;
-      }
-      store.setCurrentUser(user);
-      toast.success(`Welcome back, ${user.name}!`);
-      navigate({ to: "/dashboard" });
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : "Something went wrong";
+      toast.error(msg);
+    } finally {
+      setBusy(false);
     }
   };
 
   return (
     <div className="min-h-screen bg-background">
       <Header />
+      <Toaster />
       <div className="container mx-auto flex items-center justify-center px-4 py-16">
         <Card className="w-full max-w-md border-border/60 p-8 shadow-glow">
           <div className="mb-6 text-center">
@@ -95,8 +94,8 @@ function LoginPage() {
               <Label htmlFor="password">Password</Label>
               <Input id="password" type="password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="••••••••" />
             </div>
-            <Button type="submit" className="w-full bg-gradient-brand shadow-soft hover:opacity-90">
-              {mode === "signup" ? "Create account" : "Log in"}
+            <Button type="submit" disabled={busy} className="w-full bg-gradient-brand shadow-soft hover:opacity-90">
+              {busy ? "Please wait…" : mode === "signup" ? "Create account" : "Log in"}
             </Button>
           </form>
 
