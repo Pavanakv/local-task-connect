@@ -5,10 +5,6 @@ import type { Database } from "@/integrations/supabase/types";
 
 export type TableName = keyof Database["public"]["Tables"];
 
-type Row<T extends TableName> = Database["public"]["Tables"][T]["Row"];
-type Insert<T extends TableName> = Database["public"]["Tables"][T]["Insert"];
-type Update<T extends TableName> = Database["public"]["Tables"][T]["Update"];
-
 export type ListOptions = {
   filters?: Record<string, string | number | boolean | null>;
   orderBy?: { column: string; ascending?: boolean };
@@ -21,13 +17,15 @@ function log(scope: string, ...args: unknown[]) {
   if (typeof window !== "undefined") console.log(`[db:${scope}]`, ...args);
 }
 
+// Cast through `any` to keep a flexible runtime API while preserving call sites.
+// Strongly-typed helpers (listTasks, etc.) are exported below for typed use.
+/* eslint-disable @typescript-eslint/no-explicit-any */
 export const db = {
-  async getAll<T extends TableName>(table: T, opts: ListOptions = {}): Promise<Row<T>[]> {
-    let q = supabase.from(table).select(opts.select ?? "*");
+  async getAll(table: TableName, opts: ListOptions = {}): Promise<any[]> {
+    let q: any = supabase.from(table).select(opts.select ?? "*");
     if (opts.filters) {
       for (const [k, v] of Object.entries(opts.filters)) {
-        if (v === null) q = q.is(k, null);
-        else q = q.eq(k, v as never);
+        q = v === null ? q.is(k, null) : q.eq(k, v);
       }
     }
     if (opts.orderBy) q = q.order(opts.orderBy.column, { ascending: opts.orderBy.ascending ?? false });
@@ -37,43 +35,43 @@ export const db = {
     }
     const { data, error } = await q;
     if (error) { log(table, "getAll error", error); throw error; }
-    return (data ?? []) as unknown as Row<T>[];
+    return data ?? [];
   },
 
-  async getById<T extends TableName>(table: T, id: string): Promise<Row<T> | null> {
-    const { data, error } = await supabase.from(table).select("*").eq("id", id as never).maybeSingle();
+  async getById(table: TableName, id: string): Promise<any | null> {
+    const { data, error } = await (supabase.from(table) as any).select("*").eq("id", id).maybeSingle();
     if (error) { log(table, "getById error", error); throw error; }
-    return (data ?? null) as Row<T> | null;
+    return data ?? null;
   },
 
-  async create<T extends TableName>(table: T, values: Insert<T>): Promise<Row<T>> {
-    const { data, error } = await supabase.from(table).insert(values as never).select().single();
+  async create(table: TableName, values: Record<string, unknown>): Promise<any> {
+    const { data, error } = await (supabase.from(table) as any).insert(values).select().single();
     if (error) { log(table, "create error", error); throw error; }
-    return data as unknown as Row<T>;
+    return data;
   },
 
-  async update<T extends TableName>(table: T, id: string, values: Update<T>): Promise<Row<T>> {
-    const { data, error } = await supabase.from(table).update(values as never).eq("id", id as never).select().single();
+  async update(table: TableName, id: string, values: Record<string, unknown>): Promise<any> {
+    const { data, error } = await (supabase.from(table) as any).update(values).eq("id", id).select().single();
     if (error) { log(table, "update error", error); throw error; }
-    return data as unknown as Row<T>;
+    return data;
   },
 
-  async remove<T extends TableName>(table: T, id: string): Promise<void> {
-    const { error } = await supabase.from(table).delete().eq("id", id as never);
+  async remove(table: TableName, id: string): Promise<void> {
+    const { error } = await (supabase.from(table) as any).delete().eq("id", id);
     if (error) { log(table, "remove error", error); throw error; }
   },
 };
+/* eslint-enable @typescript-eslint/no-explicit-any */
 
 export const CATEGORIES = [
   "Plumbing", "Electrical", "Tutoring", "Moving",
   "Cleaning", "Handyman", "Tech Help", "Other",
 ] as const;
 
+type Row<T extends TableName> = Database["public"]["Tables"][T]["Row"];
 export type Task = Row<"tasks">;
 export type Profile = Row<"profiles">;
 export type TaskResponse = Row<"task_responses">;
-
-// Joined task with poster's profile name
 export type TaskWithProfile = Task & { profiles: { full_name: string } | null };
 
 export async function listTasks(opts: { category?: string; search?: string } = {}): Promise<TaskWithProfile[]> {
