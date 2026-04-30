@@ -1,22 +1,16 @@
 import { Link, useNavigate, useRouterState } from "@tanstack/react-router";
 import { Button } from "@/components/ui/button";
 import { ThemeToggle } from "./ThemeToggle";
-import { useEffect, useState } from "react";
-import { store, type User } from "@/lib/store";
+import { useAuth } from "@/lib/auth";
 import logo from "@/assets/logo.jpg";
 
 export function Header() {
   const navigate = useNavigate();
-  const path = useRouterState({ select: (s) => s.location.pathname });
-  const [user, setUser] = useState<User | null>(null);
+  useRouterState({ select: (s) => s.location.pathname });
+  const { user, signOut } = useAuth();
 
-  useEffect(() => {
-    setUser(store.getCurrentUser());
-  }, [path]);
-
-  const logout = () => {
-    store.setCurrentUser(null);
-    setUser(null);
+  const logout = async () => {
+    await signOut();
     navigate({ to: "/" });
   };
 

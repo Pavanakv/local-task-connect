@@ -5,56 +5,54 @@ import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { CATEGORIES, store, type Task, type User } from "@/lib/store";
+import { CATEGORIES, db, type Task } from "@/lib/db";
 import { toast } from "sonner";
+import type { User } from "@supabase/supabase-js";
 
 export function PostTaskDialog({
-  open,
-  onOpenChange,
-  user,
-  onCreated,
+  open, onOpenChange, user, onCreated, editing,
 }: {
   open: boolean;
   onOpenChange: (o: boolean) => void;
   user: User;
   onCreated: (t: Task) => void;
+  editing?: Task | null;
 }) {
-  const [title, setTitle] = useState("");
-  const [description, setDescription] = useState("");
-  const [category, setCategory] = useState<string>(CATEGORIES[0]);
-  const [location, setLocation] = useState("");
-  const [contact, setContact] = useState(user.email);
+  const [title, setTitle] = useState(editing?.title ?? "");
+  const [description, setDescription] = useState(editing?.description ?? "");
+  const [category, setCategory] = useState<string>(editing?.category ?? CATEGORIES[0]);
+  const [location, setLocation] = useState(editing?.location ?? "");
+  const [contact, setContact] = useState(editing?.contact ?? user.email ?? "");
+  const [busy, setBusy] = useState(false);
 
-  const submit = (e: React.FormEvent) => {
+  const submit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!title.trim() || !description.trim() || !location.trim() || !contact.trim()) {
-      toast.error("Please fill in all fields");
-      return;
+      toast.error("Please fill in all fields"); return;
     }
-    const task: Task = {
-      id: crypto.randomUUID(),
-      userId: user.id,
-      userName: user.name,
-      title: title.trim(),
-      description: description.trim(),
-      category,
-      location: location.trim(),
-      contact: contact.trim(),
-      createdAt: Date.now(),
-    };
-    const tasks = [task, ...store.getTasks()];
-    store.saveTasks(tasks);
-    onCreated(task);
-    toast.success("Task posted!");
-    setTitle(""); setDescription(""); setLocation(""); setCategory(CATEGORIES[0]);
-    onOpenChange(false);
+    setBusy(true);
+    try {
+      const payload = {
+        title: title.trim(), description: description.trim(),
+        category, location: location.trim(), contact: contact.trim(),
+      };
+      const result = editing
+        ? await db.update("tasks", editing.id, payload)
+        : await db.create("tasks", { ...payload, user_id: user.id });
+      onCreated(result as Task);
+      toast.success(editing ? "Task updated" : "Task posted!");
+      if (!editing) { setTitle(""); setDescription(""); setLocation(""); setCategory(CATEGORIES[0]); }
+      onOpenChange(false);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed to save");
+    } finally { setBusy(false); }
   };
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-lg">
         <DialogHeader>
-          <DialogTitle>Post a task</DialogTitle>
+          <DialogTitle>{editing ? "Edit task" : "Post a task"}</DialogTitle>
           <DialogDescription>Share what you need help with — local helpers will reach out.</DialogDescription>
         </DialogHeader>
         <form onSubmit={submit} className="space-y-4">
@@ -85,7 +83,9 @@ export function PostTaskDialog({
             <Label htmlFor="contact">Contact info</Label>
             <Input id="contact" value={contact} onChange={(e) => setContact(e.target.value)} placeholder="email or phone" maxLength={120} />
           </div>
-          <Button type="submit" className="w-full bg-gradient-brand shadow-soft hover:opacity-90">Post task</Button>
+          <Button type="submit" disabled={busy} className="w-full bg-gradient-brand shadow-soft hover:opacity-90">
+            {busy ? "Saving…" : editing ? "Save changes" : "Post task"}
+          </Button>
         </form>
       </DialogContent>
     </Dialog>
